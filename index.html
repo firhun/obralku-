@@ -361,6 +361,7 @@ input,select{font-family:inherit;font-size:15px}
     <div class="modal-foot">
       <span style="font-size:13px;color:var(--muted);margin-right:auto;font-weight:600" id="prTotal">0 label</span>
       <button class="btn-ghost" style="height:42px;border-radius:8px;padding:0 18px" onclick="closePrintModal()">Batal</button>
+      <button class="btn-ghost" style="height:42px;border-radius:8px;padding:0 18px" onclick="doPreview()">Pratinjau</button>
       <button class="btn" style="height:42px" onclick="doBulkPrint()">Cetak</button>
     </div>
   </div>
@@ -436,7 +437,7 @@ function refreshCurrentView(){
 }
 
 const rp=n=>"Rp "+Math.round(n).toLocaleString("id-ID");
-const today=()=>new Date().toISOString().slice(0,10);
+const today=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');};
 const nowTime=()=>new Date().toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'});
 const pillClass=c=>c==="Old Stock"?"pill-old":c==="Cacat Ringan"?"pill-cacat":"pill-ob";
 function toast(msg,ok){const t=document.getElementById('toast');t.textContent=msg;t.className='toast show'+(ok?' ok':'');setTimeout(()=>t.className='toast',2200);}
@@ -696,7 +697,7 @@ function renderLaporan(){
   const tx=db.transactions.filter(t=>t.date===today());
   const cashToday=tx.reduce((s,t)=>s+t.total,0);
   const cashTotal=db.transactions.reduce((s,t)=>s+t.total,0);
-  const modalRecovered=db.transactions.reduce((s,t)=>s+t.items.reduce((a,i)=>a+i.cost*i.qty,0),0);
+  const modalRecovered=db.transactions.reduce((s,t)=>s+(t.items||[]).reduce((a,i)=>a+i.cost*i.qty,0),0);
   const modalStuck=db.products.reduce((s,p)=>s+(p.gudang+p.toko)*p.cost,0);
   const denom=modalRecovered+modalStuck;
   const pct=denom>0?Math.round(modalRecovered/denom*100):0;
@@ -787,9 +788,9 @@ function updatePrTotal(){const t=getPrintSelection().reduce((s,x)=>s+x.n,0);docu
 function onSizeChange(){const v=document.getElementById('lblSize').value,cs=document.getElementById('customSize');if(v==='custom'){cs.classList.remove('hidden');}else{cs.classList.add('hidden');const a=v.split('x');labelSize={w:+a[0],h:+a[1]};}}
 function resolveSize(){const v=document.getElementById('lblSize').value;if(v==='custom'){return {w:+document.getElementById('lblW').value||33,h:+document.getElementById('lblH').value||15};}const a=v.split('x');return {w:+a[0],h:+a[1]};}
 function barcodeSVG(code){const tmp=document.createElementNS('http://www.w3.org/2000/svg','svg');JsBarcode(tmp,code,{format:'CODE128',displayValue:false,height:60,width:2,margin:0});tmp.setAttribute('xmlns','http://www.w3.org/2000/svg');return tmp.outerHTML;}
-function doBulkPrint(){
+function buildLabelSheet(forPrint){
   const sel=getPrintSelection();
-  if(sel.length===0){toast('Pilih minimal satu barang');return;}
+  if(sel.length===0){toast('Pilih minimal satu barang');return null;}
   const sz=resolveSize(),w=sz.w,h=sz.h;
   const ncols=Math.max(1,parseInt(document.getElementById('lblCols').value,10)||1);
   const colGap=parseFloat(document.getElementById('colGap').value)||0;
@@ -799,7 +800,7 @@ function doBulkPrint(){
   const barH=Math.max(5,Math.round(h*0.42));
   const items=[];
   sel.forEach(it=>{for(let i=0;i<it.n;i++)items.push(it.p);});
-  if(items.length>1500){toast('Maksimal 1500 label sekali cetak');return;}
+  if(items.length>1500){toast('Maksimal 1500 label sekali cetak');return null;}
   const labelHTML=p=>{
     const svg=barcodeSVG(p.barcode);
     const inner=compact
@@ -812,22 +813,37 @@ function doBulkPrint(){
     rows+='<div class="row">'+items.slice(i,i+ncols).map(labelHTML).join('')+'</div>';
   }
   const rowW=ncols*w+(ncols-1)*colGap;
-  const css='@page{size:'+rowW+'mm '+h+'mm;margin:0}'+
+  let css='@page{size:'+rowW+'mm '+h+'mm;margin:0}'+
     '*{margin:0;box-sizing:border-box}html,body{width:'+rowW+'mm}body{font-family:Arial,sans-serif}'+
     '.row{width:'+rowW+'mm;height:'+h+'mm;display:flex;page-break-after:always;overflow:hidden}'+
     '.row:last-child{page-break-after:auto}'+
-    '.label{width:'+w+'mm;height:'+h+'mm;margin-right:'+colGap+'mm;display:flex;align-items:center;justify-content:center;overflow:hidden}'+
+    '.label{width:'+w+'mm;height:'+h+'mm;margin-right:'+colGap+'mm;background:#fff;display:flex;align-items:center;justify-content:center;overflow:hidden}'+
     '.label:last-child{margin-right:0}'+
     '.inr{display:flex;flex-direction:column;align-items:center;width:100%;padding:'+(compact?'0.6mm':'1.5mm')+';transform:translate('+ox+'mm,'+oy+'mm)}'+
     '.nm{font-size:7pt;font-weight:bold;text-align:center;line-height:1.05;max-height:16pt;overflow:hidden}'+
     '.pr{font-weight:bold;font-size:'+(compact?'8pt':'11pt')+';line-height:1.1}'+
     '.inr svg{width:100%;height:'+barH+'mm}'+
     '.bc{font-family:monospace;font-size:'+(compact?'5pt':'6pt')+';letter-spacing:.5px;line-height:1.1}';
+  let banner='',script='';
+  if(forPrint){
+    script='<scr'+'ipt>window.onload=function(){setTimeout(function(){window.print();},250);}</scr'+'ipt>';
+  }else{
+    css+='html,body{width:auto}body{background:#9aa0aa;padding:14px}.row{outline:1px solid #2c3e50;margin-bottom:8px}.label{outline:1px dashed #c0392b}';
+    banner='<div style="background:#fff;padding:10px 14px;margin-bottom:12px;border-radius:8px;font-size:13px;max-width:520px">Ini <b>pratinjau tata letak</b> ('+ncols+' kolom). Kalau di sini sudah <b>'+ncols+' label sejajar</b> dan rapi, berarti aplikasinya sudah benar — sisanya tinggal setelan printer. Tutup tab ini untuk kembali.</div>';
+  }
+  return '<!DOCTYPE html><html><head><meta charset="utf-8"><title>label</title><style>'+css+'</style></head><body>'+banner+rows+script+'</body></html>';
+}
+function doBulkPrint(){
+  const html=buildLabelSheet(true);if(!html)return;
   const win=window.open('','_blank');
   if(!win){toast('Izinkan pop-up untuk mencetak');return;}
-  win.document.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>label</title><style>'+css+'</style></head><body>'+rows+
-    '<scr'+'ipt>window.onload=function(){setTimeout(function(){window.print();},200);}</scr'+'ipt></body></html>');
-  win.document.close();closePrintModal();
+  win.document.write(html);win.document.close();closePrintModal();
+}
+function doPreview(){
+  const html=buildLabelSheet(false);if(!html)return;
+  const win=window.open('','_blank');
+  if(!win){toast('Izinkan pop-up untuk pratinjau');return;}
+  win.document.write(html);win.document.close();
 }
 init();
 </script>
