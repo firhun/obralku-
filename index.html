@@ -327,6 +327,7 @@ input,select{font-family:inherit;font-size:15px}
         <div class="field" style="margin:0">
           <label>Ukuran label</label>
           <select id="lblSize" onchange="onSizeChange()" style="height:38px;padding:0 10px;border:1.5px solid var(--line-2);border-radius:8px">
+            <option value="33x15">33 × 15 mm</option>
             <option value="50x30">50 × 30 mm</option>
             <option value="40x30">40 × 30 mm</option>
             <option value="33x25">33 × 25 mm</option>
@@ -776,7 +777,7 @@ function prQtyFromStock(){db.products.forEach(p=>{const q=document.getElementByI
 function getPrintSelection(){const sel=[];db.products.forEach(p=>{const c=document.getElementById('prchk-'+p.id),q=document.getElementById('prqty-'+p.id);if(c&&c.checked){const n=parseInt(q.value,10)||0;if(n>0)sel.push({p,n});}});return sel;}
 function updatePrTotal(){const t=getPrintSelection().reduce((s,x)=>s+x.n,0);document.getElementById('prTotal').textContent=t+' label';}
 function onSizeChange(){const v=document.getElementById('lblSize').value,cs=document.getElementById('customSize');if(v==='custom'){cs.classList.remove('hidden');}else{cs.classList.add('hidden');const a=v.split('x');labelSize={w:+a[0],h:+a[1]};}}
-function resolveSize(){if(document.getElementById('lblSize').value==='custom'){labelSize={w:+document.getElementById('lblW').value||50,h:+document.getElementById('lblH').value||30};}return labelSize;}
+function resolveSize(){const v=document.getElementById('lblSize').value;if(v==='custom'){return {w:+document.getElementById('lblW').value||33,h:+document.getElementById('lblH').value||15};}const a=v.split('x');return {w:+a[0],h:+a[1]};}
 function barcodeSVG(code){const tmp=document.createElementNS('http://www.w3.org/2000/svg','svg');JsBarcode(tmp,code,{format:'CODE128',displayValue:false,height:60,width:2,margin:0});tmp.setAttribute('xmlns','http://www.w3.org/2000/svg');return tmp.outerHTML;}
 function doBulkPrint(){
   const sel=getPrintSelection();
@@ -784,20 +785,27 @@ function doBulkPrint(){
   const sz=resolveSize(),w=sz.w,h=sz.h;
   const total=sel.reduce((s,x)=>s+x.n,0);
   if(total>1000){toast('Maksimal 1000 label sekali cetak');return;}
+  const compact=h<25;
+  const barH=Math.max(5,Math.round(h*0.42));
   let labels='';
-  sel.forEach(function(it){const svg=barcodeSVG(it.p.barcode);const one='<div class="label"><div class="nm">'+it.p.name+'</div><div class="pr">'+rp(it.p.price)+'</div>'+svg+'<div class="bc">'+it.p.barcode+'</div></div>';labels+=one.repeat(it.n);});
+  sel.forEach(function(it){
+    const svg=barcodeSVG(it.p.barcode);
+    const inner=compact
+      ? '<div class="pr">'+rp(it.p.price)+'</div>'+svg+'<div class="bc">'+it.p.barcode+'</div>'
+      : '<div class="nm">'+it.p.name+'</div><div class="pr">'+rp(it.p.price)+'</div>'+svg+'<div class="bc">'+it.p.barcode+'</div>';
+    labels+=('<div class="label">'+inner+'</div>').repeat(it.n);
+  });
+  const css='@page{size:'+w+'mm '+h+'mm;margin:0}'+
+    '*{margin:0;box-sizing:border-box}html,body{width:'+w+'mm}body{font-family:Arial,sans-serif}'+
+    '.label{width:'+w+'mm;height:'+h+'mm;padding:'+(compact?'0.6mm':'1.5mm')+';display:flex;flex-direction:column;align-items:center;justify-content:center;page-break-after:always;overflow:hidden}'+
+    '.label:last-child{page-break-after:auto}'+
+    '.nm{font-size:7pt;font-weight:bold;text-align:center;line-height:1.05;max-height:16pt;overflow:hidden}'+
+    '.pr{font-weight:bold;font-size:'+(compact?'8pt':'11pt')+';line-height:1.1}'+
+    '.label svg{width:100%;height:'+barH+'mm}'+
+    '.bc{font-family:monospace;font-size:'+(compact?'5pt':'6pt')+';letter-spacing:.5px;line-height:1.1}';
   const win=window.open('','_blank');
   if(!win){toast('Izinkan pop-up untuk mencetak');return;}
-  win.document.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>Cetak label</title><style>'+
-    '@page{size:'+w+'mm '+h+'mm;margin:0}'+
-    '*{margin:0;box-sizing:border-box}body{font-family:Arial,sans-serif}'+
-    '.label{width:'+w+'mm;height:'+h+'mm;padding:1.5mm;display:flex;flex-direction:column;align-items:center;justify-content:center;page-break-after:always;overflow:hidden}'+
-    '.label:last-child{page-break-after:auto}'+
-    '.nm{font-size:7pt;font-weight:bold;text-align:center;line-height:1.1;max-height:18pt;overflow:hidden}'+
-    '.pr{font-size:11pt;font-weight:bold;margin:1pt 0}'+
-    '.label svg{width:100%;height:auto;max-height:'+(h*0.5)+'mm}'+
-    '.bc{font-family:monospace;font-size:6pt;letter-spacing:.5px}'+
-    '</style></head><body>'+labels+
+  win.document.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>Cetak label</title><style>'+css+'</style></head><body>'+labels+
     '<scr'+'ipt>window.onload=function(){setTimeout(function(){window.print();},200);}</scr'+'ipt></body></html>');
   win.document.close();closePrintModal();
 }
