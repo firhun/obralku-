@@ -341,6 +341,10 @@ input,select{font-family:inherit;font-size:15px}
         </div>
       </div>
       <div style="display:flex;gap:12px;margin-bottom:14px;flex-wrap:wrap">
+        <div class="field" style="margin:0"><label>Lebar halaman printer (mm)</label><input id="pageW" type="number" value="100" step="1" style="width:128px;height:38px;padding:0 10px;border:1.5px solid var(--line-2);border-radius:8px"></div>
+        <div class="field" style="margin:0"><label>Tinggi halaman printer (mm)</label><input id="pageH" type="number" value="70" step="1" style="width:128px;height:38px;padding:0 10px;border:1.5px solid var(--line-2);border-radius:8px"></div>
+      </div>
+      <div style="display:flex;gap:12px;margin-bottom:14px;flex-wrap:wrap">
         <div class="field" style="margin:0"><label>Label per baris (kolom)</label><input id="lblCols" type="number" value="1" min="1" style="width:128px;height:38px;padding:0 10px;border:1.5px solid var(--line-2);border-radius:8px"></div>
         <div class="field" style="margin:0"><label>Jarak antar kolom (mm)</label><input id="colGap" type="number" value="2" step="0.5" style="width:128px;height:38px;padding:0 10px;border:1.5px solid var(--line-2);border-radius:8px"></div>
         <div class="field" style="margin:0"><label>Jarak antar baris (mm)</label><input id="rowGapV" type="number" value="0" step="0.5" style="width:128px;height:38px;padding:0 10px;border:1.5px solid var(--line-2);border-radius:8px"></div>
@@ -356,7 +360,7 @@ input,select{font-family:inherit;font-size:15px}
       </div>
       <div id="prList"></div>
       <div style="font-size:12px;color:var(--muted);margin-top:14px;line-height:1.55;background:var(--paper);padding:10px 12px;border-radius:8px">
-        💡 <b>Untuk printer Sato:</b> di dialog cetak, pilih printer Sato, set ukuran kertas = ukuran label di atas, margin 0, dan matikan header/footer browser.
+        💡 <b>Printer SATO (driver dikunci 100×70mm):</b> set "Lebar/Tinggi halaman printer" = <b>100 × 70</b> (sama persis dengan driver). Lalu atur kolom, jarak, &amp; geser pakai <b>Pratinjau</b> sampai label pas. Saat cetak: matikan header/footer, scale 100%/Default.
       </div>
     </div>
     <div class="modal-foot">
@@ -798,6 +802,8 @@ function buildLabelSheet(forPrint){
   const rowGapV=parseFloat(document.getElementById('rowGapV').value)||0;
   const ox=parseFloat(document.getElementById('offX').value)||0;
   const oy=parseFloat(document.getElementById('offY').value)||0;
+  const pageW=parseFloat(document.getElementById('pageW').value)||100;
+  const pageH=parseFloat(document.getElementById('pageH').value)||70;
   const compact=h<25;
   const barH=Math.max(5,Math.round(h*0.42));
   const items=[];
@@ -810,18 +816,21 @@ function buildLabelSheet(forPrint){
       : '<div class="nm">'+p.name+'</div><div class="pr">'+rp(p.price)+'</div>'+svg+'<div class="bc">'+p.barcode+'</div>';
     return '<div class="label"><div class="inr">'+inner+'</div></div>';
   };
-  let rows='';
-  for(let i=0;i<items.length;i+=ncols){
-    rows+='<div class="row">'+items.slice(i,i+ncols).map(labelHTML).join('')+'</div>';
+  const rowsPerPage=Math.max(1,Math.floor(pageH/(h+rowGapV)));
+  const perPage=ncols*rowsPerPage;
+  let pages='';
+  for(let i=0;i<items.length;i+=perPage){
+    pages+='<div class="page"><div class="grid">'+items.slice(i,i+perPage).map(labelHTML).join('')+'</div></div>';
   }
-  const rowW=ncols*w+(ncols-1)*colGap;
-  let css='@page{size:'+rowW+'mm auto;margin:0}'+
-    '*{margin:0;box-sizing:border-box}html,body{width:'+rowW+'mm}body{font-family:Arial,sans-serif}'+
-    '.row{width:'+rowW+'mm;height:'+h+'mm;display:flex;overflow:hidden;margin-bottom:'+rowGapV+'mm}'+
-    '.row:last-child{margin-bottom:0}'+
-    '.label{width:'+w+'mm;height:'+h+'mm;margin-right:'+colGap+'mm;background:#fff;display:flex;align-items:center;justify-content:center;overflow:hidden}'+
-    '.label:last-child{margin-right:0}'+
-    '.inr{display:flex;flex-direction:column;align-items:center;width:100%;padding:'+(compact?'0.6mm':'1.5mm')+';transform:translate('+ox+'mm,'+oy+'mm)}'+
+  const gridW=ncols*w+(ncols-1)*colGap;
+  let css='@page{size:'+pageW+'mm '+pageH+'mm;margin:0}'+
+    '*{margin:0;box-sizing:border-box}html,body{width:'+pageW+'mm}body{font-family:Arial,sans-serif}'+
+    '.page{width:'+pageW+'mm;height:'+pageH+'mm;page-break-after:always;overflow:hidden;position:relative}'+
+    '.page:last-child{page-break-after:auto}'+
+    '.grid{display:flex;flex-wrap:wrap;width:'+gridW+'mm;transform:translate('+ox+'mm,'+oy+'mm)}'+
+    '.label{width:'+w+'mm;height:'+h+'mm;margin-right:'+colGap+'mm;margin-bottom:'+rowGapV+'mm;background:#fff;display:flex;align-items:center;justify-content:center;overflow:hidden}'+
+    '.label:nth-child('+ncols+'n){margin-right:0}'+
+    '.inr{display:flex;flex-direction:column;align-items:center;width:100%;padding:'+(compact?'0.6mm':'1.5mm')+'}'+
     '.nm{font-size:7pt;font-weight:bold;text-align:center;line-height:1.05;max-height:16pt;overflow:hidden}'+
     '.pr{font-weight:bold;font-size:'+(compact?'8pt':'11pt')+';line-height:1.1}'+
     '.inr svg{width:100%;height:'+barH+'mm}'+
@@ -830,10 +839,10 @@ function buildLabelSheet(forPrint){
   if(forPrint){
     script='<scr'+'ipt>window.onload=function(){setTimeout(function(){window.print();},250);}</scr'+'ipt>';
   }else{
-    css+='html,body{width:auto}body{background:#9aa0aa;padding:14px}.row{outline:1px solid #2c3e50;margin-bottom:8px}.label{outline:1px dashed #c0392b}';
-    banner='<div style="background:#fff;padding:10px 14px;margin-bottom:12px;border-radius:8px;font-size:13px;max-width:520px">Ini <b>pratinjau tata letak</b> ('+ncols+' kolom). Kalau di sini sudah <b>'+ncols+' label sejajar</b> dan rapi, berarti aplikasinya sudah benar — sisanya tinggal setelan printer. Tutup tab ini untuk kembali.</div>';
+    css+='body{background:#9aa0aa;padding:14px}.page{outline:2px solid #2c3e50;margin-bottom:12px;background:#fff}.label{outline:1px dashed #c0392b}';
+    banner='<div style="background:#fff;padding:10px 14px;margin-bottom:12px;border-radius:8px;font-size:13px;max-width:560px;font-family:Arial">Pratinjau — kotak biru = 1 halaman printer ('+pageW+'×'+pageH+'mm), garis merah = tiap label ('+w+'×'+h+'mm, '+ncols+' kolom). Pakai "Geser" &amp; "Jarak" sampai label pas di kotaknya. Tutup tab untuk kembali.</div>';
   }
-  return '<!DOCTYPE html><html><head><meta charset="utf-8"><title>label</title><style>'+css+'</style></head><body>'+banner+rows+script+'</body></html>';
+  return '<!DOCTYPE html><html><head><meta charset="utf-8"><title>label</title><style>'+css+'</style></head><body>'+banner+pages+script+'</body></html>';
 }
 function doBulkPrint(){
   const html=buildLabelSheet(true);if(!html)return;
