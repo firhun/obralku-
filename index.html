@@ -323,6 +323,11 @@ input,select{font-family:inherit;font-size:15px}
   <div class="modal">
     <div class="modal-head"><h3>🏷️ Cetak Label Barcode</h3><button class="modal-x" onclick="closePrintModal()">✕</button></div>
     <div class="modal-body">
+      <label style="display:flex;align-items:center;gap:9px;font-size:14px;cursor:pointer;margin-bottom:16px;background:var(--sage-soft);padding:11px 13px;border-radius:8px">
+        <input type="checkbox" id="a4mode" onchange="onA4Change()" style="width:18px;height:18px;accent-color:var(--sage);flex-shrink:0">
+        <span><b>Mode kertas A4 (printer biasa / Epson)</b> — grid label rapi + garis potong, tinggal gunting. Setelan di bawah otomatis diatur.</span>
+      </label>
+      <div id="thermalOpts">
       <div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;margin-bottom:16px">
         <div class="field" style="margin:0">
           <label>Ukuran label</label>
@@ -352,6 +357,7 @@ input,select{font-family:inherit;font-size:15px}
       <div style="display:flex;gap:12px;margin-bottom:14px;flex-wrap:wrap">
         <div class="field" style="margin:0"><label>Geser mendatar (mm)</label><input id="offX" type="number" value="0" step="0.5" style="width:128px;height:38px;padding:0 10px;border:1.5px solid var(--line-2);border-radius:8px"></div>
         <div class="field" style="margin:0"><label>Geser tegak (mm)</label><input id="offY" type="number" value="0" step="0.5" style="width:128px;height:38px;padding:0 10px;border:1.5px solid var(--line-2);border-radius:8px"></div>
+      </div>
       </div>
       <div style="display:flex;gap:8px;margin-bottom:6px;flex-wrap:wrap">
         <button class="btn-ghost btn-sm" style="border-radius:8px" onclick="prCheckAll(true)">Centang semua</button>
@@ -793,18 +799,25 @@ function updatePrTotal(){const t=getPrintSelection().reduce((s,x)=>s+x.n,0);docu
 function onSizeChange(){const v=document.getElementById('lblSize').value,cs=document.getElementById('customSize');if(v==='custom'){cs.classList.remove('hidden');}else{cs.classList.add('hidden');const a=v.split('x');labelSize={w:+a[0],h:+a[1]};}}
 function resolveSize(){const v=document.getElementById('lblSize').value;if(v==='custom'){return {w:+document.getElementById('lblW').value||33,h:+document.getElementById('lblH').value||15};}const a=v.split('x');return {w:+a[0],h:+a[1]};}
 function barcodeSVG(code){const tmp=document.createElementNS('http://www.w3.org/2000/svg','svg');JsBarcode(tmp,code,{format:'CODE128',displayValue:false,height:60,width:2,margin:0});tmp.setAttribute('xmlns','http://www.w3.org/2000/svg');return tmp.outerHTML;}
+function onA4Change(){
+  const on=document.getElementById('a4mode').checked;
+  document.getElementById('thermalOpts').style.display=on?'none':'block';
+}
 function buildLabelSheet(forPrint){
   const sel=getPrintSelection();
   if(sel.length===0){toast('Pilih minimal satu barang');return null;}
-  const sz=resolveSize(),w=sz.w,h=sz.h;
-  const ncols=Math.max(1,parseInt(document.getElementById('lblCols').value,10)||1);
-  const colGap=parseFloat(document.getElementById('colGap').value)||0;
-  const rowGapV=parseFloat(document.getElementById('rowGapV').value)||0;
-  const ox=parseFloat(document.getElementById('offX').value)||0;
-  const oy=parseFloat(document.getElementById('offY').value)||0;
-  const pageW=parseFloat(document.getElementById('pageW').value)||100;
-  const pageH=parseFloat(document.getElementById('pageH').value)||70;
-  const compact=h<25;
+  const a4=!!(document.getElementById('a4mode')&&document.getElementById('a4mode').checked);
+  let sz=resolveSize(),w=sz.w,h=sz.h;
+  let ncols=Math.max(1,parseInt(document.getElementById('lblCols').value,10)||1);
+  let colGap=parseFloat(document.getElementById('colGap').value)||0;
+  let rowGapV=parseFloat(document.getElementById('rowGapV').value)||0;
+  let ox=parseFloat(document.getElementById('offX').value)||0;
+  let oy=parseFloat(document.getElementById('offY').value)||0;
+  let pageW=parseFloat(document.getElementById('pageW').value)||100;
+  let pageH=parseFloat(document.getElementById('pageH').value)||70;
+  let margin=0,border=false;
+  if(a4){pageW=210;pageH=297;margin=8;border=true;w=45;h=28;ncols=4;colGap=4;rowGapV=5;ox=0;oy=0;}
+  const compact=!a4 && h<25;
   const barH=Math.max(5,Math.round(h*0.42));
   const items=[];
   sel.forEach(it=>{for(let i=0;i<it.n;i++)items.push(it.p);});
@@ -816,7 +829,8 @@ function buildLabelSheet(forPrint){
       : '<div class="nm">'+p.name+'</div><div class="pr">'+rp(p.price)+'</div>'+svg+'<div class="bc">'+p.barcode+'</div>';
     return '<div class="label"><div class="inr">'+inner+'</div></div>';
   };
-  const rowsPerPage=Math.max(1,Math.floor(pageH/(h+rowGapV)));
+  const usableH=pageH-2*margin;
+  const rowsPerPage=Math.max(1,Math.floor(usableH/(h+rowGapV)));
   const perPage=ncols*rowsPerPage;
   let pages='';
   for(let i=0;i<items.length;i+=perPage){
@@ -825,22 +839,22 @@ function buildLabelSheet(forPrint){
   const gridW=ncols*w+(ncols-1)*colGap;
   let css='@page{size:'+pageW+'mm '+pageH+'mm;margin:0}'+
     '*{margin:0;box-sizing:border-box}html,body{width:'+pageW+'mm}body{font-family:Arial,sans-serif}'+
-    '.page{width:'+pageW+'mm;height:'+pageH+'mm;page-break-after:always;overflow:hidden;position:relative}'+
+    '.page{width:'+pageW+'mm;height:'+pageH+'mm;padding:'+margin+'mm;page-break-after:always;overflow:hidden;position:relative}'+
     '.page:last-child{page-break-after:auto}'+
     '.grid{display:flex;flex-wrap:wrap;width:'+gridW+'mm;transform:translate('+ox+'mm,'+oy+'mm)}'+
-    '.label{width:'+w+'mm;height:'+h+'mm;margin-right:'+colGap+'mm;margin-bottom:'+rowGapV+'mm;background:#fff;display:flex;align-items:center;justify-content:center;overflow:hidden}'+
+    '.label{width:'+w+'mm;height:'+h+'mm;margin-right:'+colGap+'mm;margin-bottom:'+rowGapV+'mm;background:#fff;'+(border?'border:0.2mm solid #999;':'')+'display:flex;align-items:center;justify-content:center;overflow:hidden}'+
     '.label:nth-child('+ncols+'n){margin-right:0}'+
     '.inr{display:flex;flex-direction:column;align-items:center;width:100%;padding:'+(compact?'0.6mm':'1.5mm')+'}'+
-    '.nm{font-size:7pt;font-weight:bold;text-align:center;line-height:1.05;max-height:16pt;overflow:hidden}'+
-    '.pr{font-weight:bold;font-size:'+(compact?'8pt':'11pt')+';line-height:1.1}'+
+    '.nm{font-size:'+(a4?'8pt':'7pt')+';font-weight:bold;text-align:center;line-height:1.1;max-height:20pt;overflow:hidden}'+
+    '.pr{font-weight:bold;font-size:'+(compact?'8pt':(a4?'12pt':'11pt'))+';line-height:1.15}'+
     '.inr svg{width:100%;height:'+barH+'mm}'+
-    '.bc{font-family:monospace;font-size:'+(compact?'5pt':'6pt')+';letter-spacing:.5px;line-height:1.1}';
+    '.bc{font-family:monospace;font-size:'+(compact?'5pt':'6pt')+';letter-spacing:.5px;line-height:1.2}';
   let banner='',script='';
   if(forPrint){
     script='<scr'+'ipt>window.onload=function(){setTimeout(function(){window.print();},250);}</scr'+'ipt>';
   }else{
-    css+='body{background:#9aa0aa;padding:14px}.page{outline:2px solid #2c3e50;margin-bottom:12px;background:#fff}.label{outline:1px dashed #c0392b}';
-    banner='<div style="background:#fff;padding:10px 14px;margin-bottom:12px;border-radius:8px;font-size:13px;max-width:560px;font-family:Arial">Pratinjau — kotak biru = 1 halaman printer ('+pageW+'×'+pageH+'mm), garis merah = tiap label ('+w+'×'+h+'mm, '+ncols+' kolom). Pakai "Geser" &amp; "Jarak" sampai label pas di kotaknya. Tutup tab untuk kembali.</div>';
+    css+='body{background:#9aa0aa;padding:14px}.page{outline:2px solid #2c3e50;margin-bottom:12px;background:#fff}'+(border?'':'.label{outline:1px dashed #c0392b}');
+    banner='<div style="background:#fff;padding:10px 14px;margin-bottom:12px;border-radius:8px;font-size:13px;max-width:560px;font-family:Arial">Pratinjau'+(a4?' — kertas A4, tinggal gunting sesuai garis kotak.':' — kotak biru = 1 halaman printer, garis merah = tiap label.')+' Tutup tab untuk kembali.</div>';
   }
   return '<!DOCTYPE html><html><head><meta charset="utf-8"><title>label</title><style>'+css+'</style></head><body>'+banner+pages+script+'</body></html>';
 }
