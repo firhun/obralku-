@@ -150,17 +150,18 @@ input,select{font-family:inherit;font-size:15px}
 <div id="login" class="login-wrap">
   <div class="login-card">
     <div class="brand">Obral<span>Ku</span></div>
-    <div class="brand-sub" id="loginSub">Pilih akun untuk masuk</div>
-    <div class="role-grid" id="accountList"></div>
-    <div id="loginStep2" class="hidden">
-      <div class="role-ic" id="loginAvatar" style="background:var(--obral-soft);margin:0 auto 14px;width:56px;height:56px;font-size:26px">👤</div>
-      <div style="margin-bottom:18px">Masuk sebagai <b id="loginName"></b></div>
+    <div class="brand-sub">Masuk ke akun kamu</div>
+    <div style="text-align:left;margin-top:22px">
+      <label style="display:block;font-size:13px;font-weight:600;margin-bottom:6px;color:var(--ink)">Nama akun</label>
+      <input type="text" id="loginUser" placeholder="Ketik nama akun" autocomplete="off"
+        onkeydown="if(event.key==='Enter')document.getElementById('loginPass').focus()"
+        style="width:100%;height:46px;padding:0 14px;border:1.5px solid var(--line-2);border-radius:var(--radius-sm);font-size:15px;margin-bottom:14px;outline:none">
+      <label style="display:block;font-size:13px;font-weight:600;margin-bottom:6px;color:var(--ink)">Sandi</label>
       <input type="password" id="loginPass" placeholder="Masukkan sandi" autocomplete="off"
         onkeydown="if(event.key==='Enter')doLogin()"
-        style="width:100%;height:46px;padding:0 14px;border:1.5px solid var(--line-2);border-radius:var(--radius-sm);text-align:center;font-size:16px;letter-spacing:2px;margin-bottom:10px">
-      <div id="loginErr" style="color:var(--obral);font-size:13px;font-weight:600;min-height:18px;margin-bottom:10px"></div>
-      <button class="btn btn-full" onclick="doLogin()" style="margin-bottom:10px">Masuk</button>
-      <button class="btn-ghost btn-full" onclick="backToAccounts()" style="height:42px;border-radius:var(--radius-sm)">Kembali</button>
+        style="width:100%;height:46px;padding:0 14px;border:1.5px solid var(--line-2);border-radius:var(--radius-sm);font-size:15px;margin-bottom:10px;outline:none">
+      <div id="loginErr" style="color:var(--obral);font-size:13px;font-weight:600;min-height:18px;margin-bottom:6px"></div>
+      <button class="btn btn-full" onclick="doLogin()">Masuk</button>
     </div>
   </div>
 </div>
@@ -331,6 +332,7 @@ input,select{font-family:inherit;font-size:15px}
         <div class="field" style="margin:0">
           <label>Ukuran label</label>
           <select id="lblSize" onchange="onSizeChange()" style="height:38px;padding:0 10px;border:1.5px solid var(--line-2);border-radius:8px">
+            <option value="35x20">35 × 20 mm</option>
             <option value="20x10">20 × 10 mm (hangtag)</option>
             <option value="33x15">33 × 15 mm</option>
             <option value="50x30">50 × 30 mm</option>
@@ -393,7 +395,6 @@ const sb=window.supabase.createClient(SUPA_URL,SUPA_KEY);
 let db={products:[],transactions:[],distributions:[],accounts:[],settings:{shopName:'Toko Cuci Gudang',receiptWidth:'58',autoPrint:true}};
 let cart=[];
 let user=null;
-let pendingAccount=null;
 let online=false;
 const roleIcon={admin:'👑',gudang:'📦',kasir:'🧾'};
 const roleLabel={admin:'Pemilik',gudang:'Gudang / Distribusi',kasir:'Kasir'};
@@ -421,10 +422,10 @@ async function loadAll(){
 async function init(){
   try{
     await loadAll();
-    renderAccountList();
+    resetLogin();
     startPolling();
   }catch(err){
-    const sub=document.getElementById('loginSub');
+    const sub=document.getElementById('loginErr');
     if(sub){sub.textContent='\u26a0 Gagal terhubung ke server. Cek internet lalu muat ulang halaman.';sub.style.color='var(--obral)';}
     console.error(err);
   }
@@ -454,36 +455,19 @@ const nowTime=()=>new Date().toLocaleTimeString('id-ID',{hour:'2-digit',minute:'
 const pillClass=c=>c==="Old Stock"?"pill-old":c==="Cacat Ringan"?"pill-cacat":"pill-ob";
 function toast(msg,ok){const t=document.getElementById('toast');t.textContent=msg;t.className='toast show'+(ok?' ok':'');setTimeout(()=>t.className='toast',2200);}
 
-function renderAccountList(){
-  const el=document.getElementById('accountList');if(!el)return;
-  el.innerHTML=db.accounts.map(a=>`
-    <button class="role-btn" onclick="selectAccount(${a.id})">
-      <span class="role-ic" style="background:var(--obral-soft)">${roleIcon[a.role]||'👤'}</span>
-      <span><b>${a.name}</b><small>${roleLabel[a.role]||a.role}</small></span>
-    </button>`).join('');
-}
-function selectAccount(id){
-  pendingAccount=db.accounts.find(a=>a.id===id);if(!pendingAccount)return;
-  document.getElementById('accountList').classList.add('hidden');
-  document.getElementById('loginSub').classList.add('hidden');
-  document.getElementById('loginStep2').classList.remove('hidden');
-  document.getElementById('loginName').textContent=pendingAccount.name;
-  document.getElementById('loginAvatar').textContent=roleIcon[pendingAccount.role]||'👤';
-  document.getElementById('loginErr').textContent='';
-  const pw=document.getElementById('loginPass');pw.value='';setTimeout(()=>pw.focus(),60);
-}
-function backToAccounts(){
-  pendingAccount=null;
-  document.getElementById('loginStep2').classList.add('hidden');
-  document.getElementById('accountList').classList.remove('hidden');
-  document.getElementById('loginSub').classList.remove('hidden');
+function resetLogin(){
+  const u=document.getElementById('loginUser'),p=document.getElementById('loginPass'),e=document.getElementById('loginErr');
+  if(u)u.value='';if(p)p.value='';if(e)e.textContent='';
+  if(u)setTimeout(()=>u.focus(),60);
 }
 function doLogin(){
-  if(!pendingAccount)return;
-  if(document.getElementById('loginPass').value!==pendingAccount.pass){
-    document.getElementById('loginErr').textContent='Sandi salah, coba lagi';return;
-  }
-  startSession(pendingAccount);
+  const name=(document.getElementById('loginUser').value||'').trim();
+  const pass=document.getElementById('loginPass').value||'';
+  const err=document.getElementById('loginErr');
+  if(!name){err.textContent='Isi nama akun dulu';return;}
+  const acc=db.accounts.find(a=>a.name.toLowerCase()===name.toLowerCase()&&a.pass===pass);
+  if(!acc){err.textContent='Nama akun atau sandi salah';return;}
+  startSession(acc);
 }
 function startSession(acc){
   user={role:acc.role,name:acc.name,accId:acc.id};
@@ -502,7 +486,7 @@ function logout(){
   user=null;cart=[];
   document.getElementById('app').classList.add('hidden');
   document.getElementById('login').classList.remove('hidden');
-  backToAccounts();renderAccountList();
+  resetLogin();
 }
 
 function renderAkun(){
