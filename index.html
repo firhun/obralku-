@@ -796,15 +796,17 @@ function preset(kind){
     toast('Siap! Pilih A4 + centang barang, lalu Cetak',true);
   }else{
     a4.checked=false;onA4Change();
-    document.getElementById('lblSize').value='33x15';onSizeChange();
-    document.getElementById('pageW').value=100;
-    document.getElementById('pageH').value=70;
+    document.getElementById('lblSize').value='custom';onSizeChange();
+    document.getElementById('lblW').value=31;
+    document.getElementById('lblH').value=15;
+    document.getElementById('pageW').value=105;
+    document.getElementById('pageH').value=20;
     document.getElementById('lblCols').value=3;
     document.getElementById('colGap').value=5;
     document.getElementById('rowGapV').value=0;
     document.getElementById('offX').value=0;
     document.getElementById('offY').value=0;
-    toast('Setelan label TSC/SATO terisi otomatis',true);
+    toast('Setelan TSC terisi — 1 baris per halaman (anti-geser)',true);
   }
 }
 function onSizeChange(){const v=document.getElementById('lblSize').value,cs=document.getElementById('customSize');if(v==='custom'){cs.classList.remove('hidden');}else{cs.classList.add('hidden');const a=v.split('x');labelSize={w:+a[0],h:+a[1]};}}
