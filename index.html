@@ -324,6 +324,13 @@ input,select{font-family:inherit;font-size:15px}
   <div class="modal">
     <div class="modal-head"><h3>🏷️ Cetak Label Barcode</h3><button class="modal-x" onclick="closePrintModal()">✕</button></div>
     <div class="modal-body">
+      <div style="margin-bottom:14px">
+        <div style="font-size:12px;font-weight:700;color:var(--muted);margin-bottom:7px;letter-spacing:.3px">SEKALI KLIK — PILIH PRINTER:</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn" style="height:40px;padding:0 16px" onclick="preset('a4')">🖨️ A4 Epson (paling gampang)</button>
+          <button class="btn-ghost" style="height:40px;border-radius:8px;padding:0 16px" onclick="preset('tsc')">🏷️ Printer label TSC/SATO</button>
+        </div>
+      </div>
       <label style="display:flex;align-items:center;gap:9px;font-size:14px;cursor:pointer;margin-bottom:16px;background:var(--sage-soft);padding:11px 13px;border-radius:8px">
         <input type="checkbox" id="a4mode" onchange="onA4Change()" style="width:18px;height:18px;accent-color:var(--sage);flex-shrink:0">
         <span><b>Mode kertas A4 (printer biasa / Epson)</b> — grid label rapi + garis potong, tinggal gunting. Setelan di bawah otomatis diatur.</span>
@@ -781,6 +788,25 @@ function prCheckAll(v){db.products.forEach(p=>{const c=document.getElementById('
 function prQtyFromStock(){db.products.forEach(p=>{const q=document.getElementById('prqty-'+p.id);if(q)q.value=Math.max(1,p.gudang);});updatePrTotal();}
 function getPrintSelection(){const sel=[];db.products.forEach(p=>{const c=document.getElementById('prchk-'+p.id),q=document.getElementById('prqty-'+p.id);if(c&&c.checked){const n=parseInt(q.value,10)||0;if(n>0)sel.push({p,n});}});return sel;}
 function updatePrTotal(){const t=getPrintSelection().reduce((s,x)=>s+x.n,0);document.getElementById('prTotal').textContent=t+' label';}
+function preset(kind){
+  const a4=document.getElementById('a4mode');
+  if(kind==='a4'){
+    a4.checked=true;onA4Change();
+    document.getElementById('lblSize').value='35x20';onSizeChange();
+    toast('Siap! Pilih A4 + centang barang, lalu Cetak',true);
+  }else{
+    a4.checked=false;onA4Change();
+    document.getElementById('lblSize').value='33x15';onSizeChange();
+    document.getElementById('pageW').value=100;
+    document.getElementById('pageH').value=70;
+    document.getElementById('lblCols').value=3;
+    document.getElementById('colGap').value=5;
+    document.getElementById('rowGapV').value=0;
+    document.getElementById('offX').value=0;
+    document.getElementById('offY').value=0;
+    toast('Setelan label TSC/SATO terisi otomatis',true);
+  }
+}
 function onSizeChange(){const v=document.getElementById('lblSize').value,cs=document.getElementById('customSize');if(v==='custom'){cs.classList.remove('hidden');}else{cs.classList.add('hidden');const a=v.split('x');labelSize={w:+a[0],h:+a[1]};}}
 function resolveSize(){const v=document.getElementById('lblSize').value;if(v==='custom'){return {w:+document.getElementById('lblW').value||33,h:+document.getElementById('lblH').value||15};}const a=v.split('x');return {w:+a[0],h:+a[1]};}
 function barcodeSVG(code){const tmp=document.createElementNS('http://www.w3.org/2000/svg','svg');JsBarcode(tmp,code,{format:'CODE128',displayValue:false,height:60,width:2,margin:0});tmp.setAttribute('xmlns','http://www.w3.org/2000/svg');return tmp.outerHTML;}
