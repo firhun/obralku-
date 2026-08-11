@@ -195,13 +195,8 @@ input,select{font-family:inherit;font-size:15px}
   </div>
 
   <div id="page-kasir" class="page">
-    <div class="card" style="margin-bottom:18px;padding:16px 20px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
-      <div>
-        <div style="font-size:13px;color:var(--muted);font-weight:600">💰 Penjualanmu hari ini</div>
-        <div style="font-size:26px;font-weight:800;letter-spacing:-0.02em" id="kasirTodayTotal">Rp 0</div>
-        <div style="font-size:12px;color:var(--muted)" id="kasirTodayCount">0 transaksi</div>
-      </div>
-      <button class="btn-ghost" style="height:44px;border-radius:8px;padding:0 18px" onclick="openSetoran()">🧾 Rincian / Tutup kasir</button>
+    <div style="display:flex;justify-content:flex-end;margin-bottom:12px">
+      <button class="btn-ghost btn-sm" style="border-radius:8px" onclick="openSetoran()">🧾 Setoran / Tutup kasir</button>
     </div>
     <div class="kasir-grid">
       <div>
@@ -654,10 +649,6 @@ function renderGudang(){
 }
 
 function renderKasir(){
-  const myTx=db.transactions.filter(t=>t.cashier===user.name&&t.date===today());
-  const myTotal=myTx.reduce((s,t)=>s+t.total,0);
-  const tt=document.getElementById('kasirTodayTotal');
-  if(tt){tt.textContent=rp(myTotal);document.getElementById('kasirTodayCount').textContent=myTx.length+' transaksi';}
   const q=(document.getElementById('kasirSearch').value||'').toLowerCase();
   const list=db.products.filter(p=>(p.name.toLowerCase().includes(q)||p.barcode.includes(q)));
   document.getElementById('kasirList').innerHTML=list.length?list.map(p=>`
