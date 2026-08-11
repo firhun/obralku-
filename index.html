@@ -338,6 +338,10 @@ input,select{font-family:inherit;font-size:15px}
         <input type="checkbox" id="a4mode" onchange="onA4Change()" style="width:18px;height:18px;accent-color:var(--sage);flex-shrink:0">
         <span><b>Mode kertas A4 (printer biasa / Epson)</b> — grid label rapi + garis potong, tinggal gunting. Setelan di bawah otomatis diatur.</span>
       </label>
+      <label style="display:flex;align-items:center;gap:9px;font-size:14px;cursor:pointer;margin-bottom:16px;background:var(--paper);padding:11px 13px;border-radius:8px">
+        <input type="checkbox" id="showName" checked style="width:18px;height:18px;accent-color:var(--obral);flex-shrink:0">
+        <span><b>Tampilkan nama barang di label</b> — kalau kepanjangan otomatis dipotong biar muat.</span>
+      </label>
       <div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;margin-bottom:16px">
         <div class="field" style="margin:0">
           <label>Ukuran label</label>
@@ -903,15 +907,16 @@ function buildLabelSheet(forPrint){
     colGap=gap;rowGapV=gap;
   }
   const compact=h<25;
-  const barH=Math.max(4,Math.round(h*0.4));
+  const withName=!document.getElementById('showName')||document.getElementById('showName').checked;
+  const barH=Math.max(4,Math.round(h*(compact&&withName?0.32:0.4)));
   const items=[];
   sel.forEach(it=>{for(let i=0;i<it.n;i++)items.push(it.p);});
   if(items.length>1500){toast('Maksimal 1500 label sekali cetak');return null;}
+  const esc=s=>String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
   const labelHTML=p=>{
     const svg=barcodeSVG(p.barcode);
-    const inner=compact
-      ? '<div class="pr">'+rp(p.price)+'</div>'+svg+'<div class="bc">'+p.barcode+'</div>'
-      : '<div class="nm">'+p.name+'</div><div class="pr">'+rp(p.price)+'</div>'+svg+'<div class="bc">'+p.barcode+'</div>';
+    const nm=withName?'<div class="nm">'+esc(p.name)+'</div>':'';
+    const inner=nm+'<div class="pr">'+rp(p.price)+'</div>'+svg+'<div class="bc">'+p.barcode+'</div>';
     return '<div class="label"><div class="inr">'+inner+'</div></div>';
   };
   const usableH=pageH-2*margin;
@@ -930,7 +935,7 @@ function buildLabelSheet(forPrint){
     '.label{width:'+w+'mm;height:'+h+'mm;margin-right:'+colGap+'mm;margin-bottom:'+rowGapV+'mm;background:#fff;'+(border?'border:0.2mm solid #999;':'')+'display:flex;align-items:center;justify-content:center;overflow:hidden}'+
     '.label:nth-child('+ncols+'n){margin-right:0}'+
     '.inr{display:flex;flex-direction:column;align-items:center;width:100%;padding:'+(compact?'0.6mm':'1.5mm')+'}'+
-    '.nm{font-size:'+(a4?'8pt':'7pt')+';font-weight:bold;text-align:center;line-height:1.1;max-height:20pt;overflow:hidden}'+
+    '.nm{font-size:'+(compact?'5.5pt':(a4?'8pt':'7pt'))+';font-weight:bold;text-align:center;line-height:1.1;width:100%;'+(compact?'white-space:nowrap;overflow:hidden;text-overflow:ellipsis;':'max-height:20pt;overflow:hidden;')+'}'+
     '.pr{font-weight:bold;font-size:'+(compact?'8pt':(a4?'12pt':'11pt'))+';line-height:1.15}'+
     '.inr svg{width:100%;height:'+barH+'mm}'+
     '.bc{font-family:monospace;font-size:'+(compact?'5pt':'6pt')+';letter-spacing:.5px;line-height:1.2}';
