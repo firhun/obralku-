@@ -195,6 +195,14 @@ input,select{font-family:inherit;font-size:15px}
   </div>
 
   <div id="page-kasir" class="page">
+    <div class="card" style="margin-bottom:18px;padding:16px 20px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
+      <div>
+        <div style="font-size:13px;color:var(--muted);font-weight:600">💰 Penjualanmu hari ini</div>
+        <div style="font-size:26px;font-weight:800;letter-spacing:-0.02em" id="kasirTodayTotal">Rp 0</div>
+        <div style="font-size:12px;color:var(--muted)" id="kasirTodayCount">0 transaksi</div>
+      </div>
+      <button class="btn-ghost" style="height:44px;border-radius:8px;padding:0 18px" onclick="openSetoran()">🧾 Rincian / Tutup kasir</button>
+    </div>
     <div class="kasir-grid">
       <div>
         <input class="prod-search" id="kasirSearch" placeholder="🔫 Tembak barcode / ketik nama..." oninput="renderKasir()" onkeydown="scanEnter(event)" autocomplete="off">
@@ -388,6 +396,26 @@ input,select{font-family:inherit;font-size:15px}
   </div>
 </div>
 
+<div id="setoranModal" class="modal-bg hidden">
+  <div class="modal">
+    <div class="modal-head"><h3>🧾 Setoran Kasir</h3><button class="modal-x" onclick="closeSetoran()">✕</button></div>
+    <div class="modal-body">
+      <div style="margin-bottom:14px;font-size:14px"><b id="setoranName">—</b> · <span id="setoranDate" style="color:var(--muted)"></span></div>
+      <div style="background:var(--sage-soft);border-radius:12px;text-align:center;padding:18px;margin-bottom:16px">
+        <div style="font-size:12px;color:var(--sage);font-weight:800;letter-spacing:.4px">TOTAL SETORAN HARI INI</div>
+        <div style="font-size:32px;font-weight:800;color:var(--sage);letter-spacing:-0.02em" id="setoranTotal">Rp 0</div>
+        <div style="font-size:12px;color:var(--muted)" id="setoranQty">0 pcs · 0 transaksi</div>
+      </div>
+      <div style="font-weight:700;font-size:14px;margin-bottom:8px">Rincian transaksi</div>
+      <div id="setoranBody"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-ghost" style="height:42px;border-radius:8px;padding:0 18px" onclick="closeSetoran()">Tutup</button>
+      <button class="btn" style="height:42px" onclick="cetakSetoran()">🖨️ Cetak setoran</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -443,7 +471,8 @@ function startPolling(){
   pollTimer=setInterval(async ()=>{
     if(!user)return;
     const pm=document.getElementById('printModal');
-    if(pm&&!pm.classList.contains('hidden'))return;
+    const sm=document.getElementById('setoranModal');
+    if((pm&&!pm.classList.contains('hidden'))||(sm&&!sm.classList.contains('hidden')))return;
     try{await loadAll();refreshCurrentView();}catch(e){}
   },8000);
 }
@@ -625,6 +654,10 @@ function renderGudang(){
 }
 
 function renderKasir(){
+  const myTx=db.transactions.filter(t=>t.cashier===user.name&&t.date===today());
+  const myTotal=myTx.reduce((s,t)=>s+t.total,0);
+  const tt=document.getElementById('kasirTodayTotal');
+  if(tt){tt.textContent=rp(myTotal);document.getElementById('kasirTodayCount').textContent=myTx.length+' transaksi';}
   const q=(document.getElementById('kasirSearch').value||'').toLowerCase();
   const list=db.products.filter(p=>(p.name.toLowerCase().includes(q)||p.barcode.includes(q)));
   document.getElementById('kasirList').innerHTML=list.length?list.map(p=>`
@@ -638,6 +671,49 @@ function renderKasir(){
   renderCart();
 }
 function focusScan(){const el=document.getElementById('kasirSearch');if(el)setTimeout(()=>el.focus(),50);}
+function openSetoran(){
+  const myTx=db.transactions.filter(t=>t.cashier===user.name&&t.date===today());
+  const total=myTx.reduce((s,t)=>s+t.total,0);
+  const qty=myTx.reduce((s,t)=>s+(t.qty||0),0);
+  document.getElementById('setoranName').textContent=user.name;
+  document.getElementById('setoranDate').textContent=today();
+  document.getElementById('setoranTotal').textContent=rp(total);
+  document.getElementById('setoranQty').textContent=qty+' pcs terjual · '+myTx.length+' transaksi';
+  document.getElementById('setoranBody').innerHTML=myTx.length
+    ? myTx.map(t=>`<div class="history-row"><div>🕐 ${t.time} · ${t.qty} item</div><div style="font-weight:700">${rp(t.total)}</div></div>`).join('')
+    : '<div class="empty">Belum ada penjualan hari ini.</div>';
+  document.getElementById('setoranModal').classList.remove('hidden');
+}
+function closeSetoran(){document.getElementById('setoranModal').classList.add('hidden');}
+function cetakSetoran(){
+  const myTx=db.transactions.filter(t=>t.cashier===user.name&&t.date===today());
+  const total=myTx.reduce((s,t)=>s+t.total,0);
+  const qty=myTx.reduce((s,t)=>s+(t.qty||0),0);
+  const s=db.settings||{receiptWidth:'58',shopName:'Toko Cuci Gudang'};
+  const w=s.receiptWidth==='80'?80:58;
+  const lines=myTx.map(t=>'<div class="it"><div class="r"><span>'+t.time+'</span><span>'+rp(t.total)+'</span></div></div>').join('');
+  const win=window.open('','_blank');
+  if(!win){toast('Izinkan pop-up untuk cetak');return;}
+  win.document.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>Setoran</title><style>'+
+    '@page{size:'+w+'mm auto;margin:0}*{margin:0;box-sizing:border-box}'+
+    'body{width:'+w+'mm;padding:3mm 2mm;font-family:monospace;font-size:'+(w===58?'9pt':'10pt')+';color:#000}'+
+    '.c{text-align:center}.b{font-weight:bold}.hr{border-top:1px dashed #000;margin:5px 0}'+
+    '.it{margin:2px 0}.it .r{display:flex;justify-content:space-between}'+
+    '.tot{display:flex;justify-content:space-between;font-weight:bold;font-size:'+(w===58?'12pt':'13pt')+'}'+
+    '</style></head><body>'+
+    '<div class="c b" style="font-size:'+(w===58?'12pt':'13pt')+'">'+s.shopName+'</div>'+
+    '<div class="c b">SETORAN KASIR</div>'+
+    '<div class="c" style="font-size:8pt">'+user.name+' &middot; '+today()+'</div>'+
+    '<div class="hr"></div>'+(lines||'<div class="c" style="font-size:8pt">Belum ada penjualan</div>')+'<div class="hr"></div>'+
+    '<div class="tot"><span>TOTAL</span><span>'+rp(total)+'</span></div>'+
+    '<div class="c" style="font-size:8pt">'+qty+' pcs &middot; '+myTx.length+' transaksi</div>'+
+    '<div class="hr"></div>'+
+    '<div style="margin-top:14px">Diserahkan: ____________</div>'+
+    '<div style="margin-top:10px">Diterima: ____________</div>'+
+    '<scr'+'ipt>window.onload=function(){setTimeout(function(){window.print();},150);}</scr'+'ipt>'+
+    '</body></html>');
+  win.document.close();
+}
 function scanEnter(e){
   if(e.key!=='Enter')return;
   e.preventDefault();
