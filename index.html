@@ -695,11 +695,9 @@ function cetakSetoran(){
   const s=db.settings||{receiptWidth:'58',shopName:'Toko Cuci Gudang'};
   const w=s.receiptWidth==='80'?80:58;
   const lines=myTx.map(t=>'<div class="it"><div class="r"><span>'+t.time+'</span><span>'+rp(t.total)+'</span></div></div>').join('');
-  const win=window.open('','_blank');
-  if(!win){toast('Izinkan pop-up untuk cetak');return;}
-  win.document.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>Setoran</title><style>'+
+  printSilently('<!DOCTYPE html><html><head><meta charset="utf-8"><title>Setoran</title><style>'+
     '@page{size:'+w+'mm auto;margin:0}*{margin:0;box-sizing:border-box}'+
-    'body{width:'+w+'mm;padding:3mm 2mm;font-family:monospace;font-size:'+(w===58?'9pt':'10pt')+';color:#000}'+
+    'body{width:'+(w===58?48:72)+'mm;margin:0 auto;padding:3mm 0;font-family:monospace;font-size:'+(w===58?'9pt':'10pt')+';color:#000}'+
     '.c{text-align:center}.b{font-weight:bold}.hr{border-top:1px dashed #000;margin:5px 0}'+
     '.it{margin:2px 0}.it .r{display:flex;justify-content:space-between}'+
     '.tot{display:flex;justify-content:space-between;font-weight:bold;font-size:'+(w===58?'12pt':'13pt')+'}'+
@@ -713,9 +711,7 @@ function cetakSetoran(){
     '<div class="hr"></div>'+
     '<div style="margin-top:14px">Diserahkan: ____________</div>'+
     '<div style="margin-top:10px">Diterima: ____________</div>'+
-    '<scr'+'ipt>window.onload=function(){setTimeout(function(){window.print();},150);}</scr'+'ipt>'+
     '</body></html>');
-  win.document.close();
 }
 function scanEnter(e){
   if(e.key!=='Enter')return;
@@ -838,12 +834,10 @@ function cetakStruk(tx){
   const lines=tx.items.map(function(it){
     return '<div class="it"><div>'+it.name+'</div><div class="r"><span>'+it.qty+' x '+rp(it.price)+'</span><span>'+rp(it.price*it.qty)+'</span></div></div>';
   }).join('');
-  const win=window.open('','_blank');
-  if(!win){toast('Izinkan pop-up untuk cetak struk');return;}
-  win.document.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>Struk</title><style>'+
+  printSilently('<!DOCTYPE html><html><head><meta charset="utf-8"><title>Struk</title><style>'+
     '@page{size:'+w+'mm auto;margin:0}'+
     '*{margin:0;box-sizing:border-box}'+
-    'body{width:'+w+'mm;padding:3mm 2mm;font-family:monospace;font-size:'+(w===58?'9pt':'10pt')+';color:#000}'+
+    'body{width:'+(w===58?48:72)+'mm;margin:0 auto;padding:3mm 0;font-family:monospace;font-size:'+(w===58?'9pt':'10pt')+';color:#000}'+
     '.c{text-align:center}.b{font-weight:bold}.hr{border-top:1px dashed #000;margin:5px 0}'+
     '.it{margin:3px 0}.it .r{display:flex;justify-content:space-between}'+
     '.tot{display:flex;justify-content:space-between;font-weight:bold;font-size:'+(w===58?'11pt':'12pt')+'}'+
@@ -854,9 +848,21 @@ function cetakStruk(tx){
     '<div class="tot"><span>TOTAL</span><span>'+rp(tx.total)+'</span></div>'+
     '<div class="hr"></div>'+
     '<div class="c" style="font-size:8pt">Terima kasih sudah belanja<br>Barang yang sudah dibeli<br>tidak dapat dikembalikan</div>'+
-    '<scr'+'ipt>window.onload=function(){setTimeout(function(){window.print();},150);}</scr'+'ipt>'+
     '</body></html>');
-  win.document.close();
+}
+function printSilently(html){
+  const old=document.getElementById('printFrame');
+  if(old)old.remove();
+  const f=document.createElement('iframe');
+  f.id='printFrame';
+  f.style.cssText='position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden';
+  document.body.appendChild(f);
+  const d=f.contentWindow.document;
+  d.open();d.write(html);d.close();
+  setTimeout(function(){
+    try{f.contentWindow.focus();f.contentWindow.print();}catch(e){toast('Gagal cetak struk');}
+    setTimeout(function(){focusScan();},400);
+  },250);
 }
 function loadSettingsUI(){
   const s=db.settings;if(!s)return;
